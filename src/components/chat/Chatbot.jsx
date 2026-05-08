@@ -43,7 +43,9 @@ export default function Chatbot({ dashboardContext }) {
   const saveMessages = (msgs) => {
     try {
       localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(msgs.slice(-MAX_MESSAGES)));
-    } catch {}
+    } catch {
+      // Ignore storage errors so chat still works in restricted browser modes.
+    }
   };
 
   const sendMessage = useCallback(async (text) => {
@@ -65,6 +67,7 @@ export default function Chatbot({ dashboardContext }) {
       setMessages(updated.slice(-MAX_MESSAGES));
       saveMessages(updated);
     } catch (err) {
+      console.error('Chatbot request failed:', err);
       const errorMsg = [...newMessages, {
         role: 'assistant',
         content: '⚠️ I had trouble connecting to the AI service. Please try again.',

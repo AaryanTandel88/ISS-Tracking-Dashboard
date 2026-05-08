@@ -1,31 +1,27 @@
 const HF_TOKEN = import.meta.env.VITE_HF_TOKEN;
+const HF_CHAT_COMPLETIONS_URL = 'https://router.huggingface.co/v1/chat/completions';
+const MISTRAL_MODEL = 'mistralai/Mistral-7B-Instruct-v0.2:featherless-ai';
 
-// Try models in order until one responds
-const MODELS = [
-  'mistralai/Mistral-7B-Instruct-v0.2',
-  'HuggingFaceH4/zephyr-7b-beta',
-  'microsoft/Phi-3-mini-4k-instruct',
-];
+async function callHFApi(messages) {
+  if (!HF_TOKEN || HF_TOKEN === 'REPLACE_WITH_YOUR_HUGGINGFACE_TOKEN') {
+    throw new Error('Missing VITE_HF_TOKEN in .env');
+  }
 
-async function callHFApi(model, messages) {
-  const res = await fetch(
-    `https://router.huggingface.co/hf-inference/models/${model}/v1/chat/completions`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${HF_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: 500,
-        temperature: 0.4,
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(30000),
-    }
-  );
+  const res = await fetch(HF_CHAT_COMPLETIONS_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${HF_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MISTRAL_MODEL,
+      messages,
+      max_tokens: 500,
+      temperature: 0.4,
+      stream: false,
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
 
   if (!res.ok) {
     const err = await res.text().catch(() => res.statusText);
@@ -47,17 +43,7 @@ export async function chatWithMistral(messages, dashboardContext) {
     ...messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
   ];
 
-  // Try each model in order
-  for (const model of MODELS) {
-    try {
-      return await callHFApi(model, apiMessages);
-    } catch (err) {
-      console.warn(`Model ${model} failed:`, err.message);
-      // Continue to next model
-    }
-  }
-
-  throw new Error('All AI models are currently unavailable. Please try again in a moment.');
+  return callHFApi(apiMessages);
 }
 
 function buildSystemPrompt(ctx) {
