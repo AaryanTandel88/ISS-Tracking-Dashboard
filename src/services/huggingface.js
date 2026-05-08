@@ -1,8 +1,31 @@
-const HF_TOKEN = import.meta.env.VITE_HF_TOKEN;
 const HF_CHAT_COMPLETIONS_URL = 'https://router.huggingface.co/v1/chat/completions';
 const MISTRAL_MODEL = 'mistralai/Mistral-7B-Instruct-v0.2:featherless-ai';
 
-async function callHFApi(messages) {
+async function callServerChatApi(messages) {
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ messages }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  const data = await res.json().catch(async () => ({
+    error: await res.text(),
+  }));
+
+  if (!res.ok) {
+    throw new Error(`${res.status}: ${data.error || 'Chat API request failed'}`);
+  }
+
+  if (!data.content) throw new Error('Empty response from chat API');
+  return data.content;
+}
+
+async function callHFApiFromBrowser(messages) {
+  const HF_TOKEN = import.meta.env.VITE_HF_TOKEN;
+
   if (!HF_TOKEN || HF_TOKEN === 'REPLACE_WITH_YOUR_HUGGINGFACE_TOKEN') {
     throw new Error('Missing VITE_HF_TOKEN in .env');
   }
@@ -32,6 +55,14 @@ async function callHFApi(messages) {
   const content = data.choices?.[0]?.message?.content?.trim();
   if (!content) throw new Error('Empty response from model');
   return content;
+}
+
+async function callHFApi(messages) {
+  if (!import.meta.env.DEV) {
+    return callServerChatApi(messages);
+  }
+
+  return callHFApiFromBrowser(messages);
 }
 
 export async function chatWithMistral(messages, dashboardContext) {
